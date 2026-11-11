@@ -1,0 +1,46 @@
+.dash-payment-planner-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.dash-payment-planner-skeleton__line,
+.dash-payment-planner-skeleton__block {
+  display: block;
+  height: 14px;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(
+    90deg,
+    var(--bg-muted) 25%,
+    var(--bg-hover) 50%,
+    var(--bg-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: dash-payment-planner-skeleton-shimmer 1.4s linear infinite;
+}
+
+.dash-payment-planner-skeleton__line--large {
+  height: 32px;
+  width: 40%;
+}
+
+.dash-payment-planner-skeleton__line--short {
+  width: 60%;
+}
+
+.dash-payment-planner-skeleton__block {
+  height: 72px;
+}
+
+@keyframes dash-payment-planner-skeleton-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-payment-planner-skeleton__line,
+  .dash-payment-planner-skeleton__block {
+    animation: none;
+  }
+}

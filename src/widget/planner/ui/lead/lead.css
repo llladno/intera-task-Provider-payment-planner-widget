@@ -1,0 +1,31 @@
+.dash-payment-planner-lead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.dash-payment-planner-lead--compact {
+  flex-direction: column;
+  gap: 0;
+}
+
+.dash-payment-planner-lead__value {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-extrabold);
+  line-height: 1.1;
+}
+
+.dash-payment-planner-lead__value--compact {
+  font-size: var(--text-2xl);
+}
+
+.dash-payment-planner-lead__text {
+  color: var(--text-muted);
+}
+
+.dash-payment-planner-lead__share {
+  margin-left: auto;
+  color: var(--accent-strong);
+  font-weight: var(--font-weight-semibold);
+}

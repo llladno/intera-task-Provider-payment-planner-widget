@@ -1,0 +1,51 @@
+.dash-payment-planner-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--dash-button-secondary-border);
+  border-radius: var(--radius-sm);
+  background: var(--dash-button-secondary-bg);
+  color: var(--dash-button-secondary-text);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.dash-payment-planner-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.dash-payment-planner-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dash-payment-planner-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dash-payment-planner-button--icon {
+  width: var(--control-h-sm);
+  padding: 0;
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.dash-payment-planner-button--link {
+  align-self: flex-start;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dash-link);
+}
+
+.dash-payment-planner-button--link:hover:not(:disabled) {
+  background: none;
+  color: var(--dash-link-hover);
+  text-decoration: underline;
+}

@@ -1,0 +1,28 @@
+.dash-payment-planner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  container-type: inline-size;
+  container-name: payment-planner;
+  font-size: var(--text-sm);
+}
+
+/* Doubled class: has to beat `.dash-card` padding regardless of stylesheet order. */
+.dash-payment-planner.dash-payment-planner--quarter {
+  padding: var(--space-3);
+}
+
+.dash-payment-planner__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.dash-payment-planner__refresh {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}

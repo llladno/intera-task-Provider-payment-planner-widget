@@ -1,0 +1,40 @@
+.dash-payment-planner-provider-shares {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-payment-planner-provider-shares__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: 3px;
+}
+
+.dash-payment-planner-provider-shares__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-payment-planner-provider-shares__value {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-payment-planner-provider-shares__bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.dash-payment-planner-provider-shares__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+}

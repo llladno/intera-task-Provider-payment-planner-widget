@@ -1,0 +1,10 @@
+.dash-payment-planner-text--muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.dash-payment-planner-text--warning {
+  color: var(--metric-severity-warning-fg);
+  font-weight: var(--font-weight-medium);
+}

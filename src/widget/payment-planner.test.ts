@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import mockData from '../data/mock-payment-queue.json';
-import type { IProviderPaymentQueueRow } from '../types/provider-payment-queue';
+import { buildSortedQueue, resolveQueueScope } from '@planner/model/compute/build-sorted-queue';
+import { computePlanFromSortedQueue } from '@planner/model/compute/compute-payment-plan';
+import mockData from '@/data/mock-payment-queue.json';
+import type { IProviderPaymentQueueRow } from '@/types/provider-payment-queue';
 import {
   computePaymentPlan,
   type IPaymentPlanResult,
-} from './payment-planner-compute';
-import { parsePaymentPlannerParams } from './payment-planner-params';
+} from '@/widget/payment-planner-compute';
+import {
+  AMOUNT_FORMATS,
+  parsePaymentPlannerParams,
+} from '@/widget/payment-planner-params';
 
 const rows = mockData as IProviderPaymentQueueRow[];
 
@@ -93,7 +98,7 @@ function makeRow(
 
 function totalOf(plan: IPaymentPlanResult, currencyName: string): number {
   return (
-    plan.currencyTotals.find((c) => c.currencyName === currencyName)
+    plan.currencyTotals.find((currencyTotal) => currencyTotal.currencyName === currencyName)
       ?.totalAmount ?? Number.NaN
   );
 }
@@ -189,14 +194,17 @@ describe('computePaymentPlan (domain rules)', () => {
       parsePaymentPlannerParams({ selectedCount: 14 }),
     );
     expect(plan.effectiveSelectedCount).toBe(14);
-    expect(plan.currencyTotals.map((c) => c.currencyName)).toEqual([
+    expect(plan.currencyTotals.map((currencyTotal) => currencyTotal.currencyName)).toEqual([
       'RUB',
       'USD',
       'EUR',
       'GBP',
     ]);
-    const grand = plan.currencyTotals.reduce((n, c) => n + c.billCount, 0);
-    expect(grand).toBe(14 - plan.invalidSelectedCount);
+    const totalBillCount = plan.currencyTotals.reduce(
+      (billsSoFar, currencyTotal) => billsSoFar + currencyTotal.billCount,
+      0,
+    );
+    expect(totalBillCount).toBe(14 - plan.invalidSelectedCount);
     expect(totalOf(plan, 'RUB')).toBe(
       240000 + 180000 + 120000 + 300000 + 170000 + 90000 + 148500,
     );
@@ -208,22 +216,22 @@ describe('computePaymentPlan (domain rules)', () => {
       parsePaymentPlannerParams({ selectedCount: 20 }),
     );
     const nullBill = plan.queueItems.find(
-      (i) => i.row.provider_bill_id === 77630,
+      (queueItem) => queueItem.row.provider_bill_id === 77630,
     );
     const negativeBill = plan.queueItems.find(
-      (i) => i.row.provider_bill_id === 77638,
+      (queueItem) => queueItem.row.provider_bill_id === 77638,
     );
     expect(nullBill?.selected).toBe(true);
     expect(nullBill?.providerAmount).toBeNull();
     expect(negativeBill?.hasInvalidAmount).toBe(true);
     expect(plan.invalidSelectedCount).toBe(2);
     const billsInTotals = plan.currencyTotals.reduce(
-      (n, c) => n + c.billCount,
+      (billsSoFar, currencyTotal) => billsSoFar + currencyTotal.billCount,
       0,
     );
     expect(billsInTotals).toBe(18);
     expect(
-      plan.providerBreakdown.some((b) => b.totalAmount <= 0),
+      plan.providerBreakdown.some((breakdownItem) => breakdownItem.totalAmount <= 0),
     ).toBe(false);
   });
 
@@ -248,8 +256,8 @@ describe('computePaymentPlan (domain rules)', () => {
     );
     for (const currency of plan.currencyTotals) {
       const shares = plan.providerBreakdown
-        .filter((b) => b.currencyId === currency.currencyId)
-        .reduce((n, b) => n + b.sharePercent, 0);
+        .filter((breakdownItem) => breakdownItem.currencyId === currency.currencyId)
+        .reduce((sharesSoFar, breakdownItem) => sharesSoFar + breakdownItem.sharePercent, 0);
       expect(shares).toBeCloseTo(100, 9);
     }
   });
@@ -259,9 +267,13 @@ describe('computePaymentPlan (domain rules)', () => {
       rows,
       parsePaymentPlannerParams({ selectedCount: 32 }),
     );
-    const rub = plan.providerBreakdown.filter((b) => b.currencyName === 'RUB');
-    const amounts = rub.map((b) => b.totalAmount);
-    expect(amounts).toEqual([...amounts].sort((a, b) => b - a));
+    const rubBreakdown = plan.providerBreakdown.filter(
+      (breakdownItem) => breakdownItem.currencyName === 'RUB',
+    );
+    const amounts = rubBreakdown.map((breakdownItem) => breakdownItem.totalAmount);
+    expect(amounts).toEqual(
+      [...amounts].sort((firstAmount, secondAmount) => secondAmount - firstAmount),
+    );
   });
 
   it('counts selected providers over valid selected bills only', () => {
@@ -291,10 +303,10 @@ describe('computePaymentPlan (domain rules)', () => {
       ],
       parsePaymentPlannerParams({ selectedCount: 5 }),
     );
-    expect(plan.queueItems.map((i) => i.row.provider_bill_id)).toEqual([
+    expect(plan.queueItems.map((queueItem) => queueItem.row.provider_bill_id)).toEqual([
       7, 8, 9, 4, 5,
     ]);
-    expect(plan.queueItems.map((i) => i.queuePosition)).toEqual([1, 2, 3, 4, 5]);
+    expect(plan.queueItems.map((queueItem) => queueItem.queuePosition)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('keeps the original order when rank and bill id are equal', () => {
@@ -305,7 +317,7 @@ describe('computePaymentPlan (domain rules)', () => {
       ],
       parsePaymentPlannerParams({}),
     );
-    expect(plan.queueItems.map((i) => i.row.provider_code)).toEqual(['B', 'A']);
+    expect(plan.queueItems.map((queueItem) => queueItem.row.provider_code)).toEqual(['B', 'A']);
   });
 
   it('applies provider, cycle and currency filters before the cut', () => {
@@ -313,7 +325,7 @@ describe('computePaymentPlan (domain rules)', () => {
       rows,
       parsePaymentPlannerParams({ currencyIds: [840], selectedCount: 3 }),
     );
-    expect(byCurrency.queueItems.every((i) => i.row.provider_currency_id === 840)).toBe(true);
+    expect(byCurrency.queueItems.every((queueItem) => queueItem.row.provider_currency_id === 840)).toBe(true);
     expect(byCurrency.effectiveSelectedCount).toBe(3);
     expect(byCurrency.currencyTotals).toHaveLength(1);
 
@@ -332,7 +344,7 @@ describe('computePaymentPlan (domain rules)', () => {
     );
     expect(zero.effectiveSelectedCount).toBe(0);
     expect(zero.currencyTotals).toEqual([]);
-    expect(zero.queueItems.some((i) => i.selected)).toBe(false);
+    expect(zero.queueItems.some((queueItem) => queueItem.selected)).toBe(false);
 
     const huge = computePaymentPlan(
       rows,
@@ -379,7 +391,7 @@ describe('computePaymentPlan (domain rules)', () => {
       ],
       parsePaymentPlannerParams({}),
     );
-    expect(plan.queueItems.map((i) => i.hasCustomerBill)).toEqual([
+    expect(plan.queueItems.map((queueItem) => queueItem.hasCustomerBill)).toEqual([
       true,
       false,
       false,
@@ -412,5 +424,35 @@ describe('computePaymentPlan (row limit)', () => {
     expect(more.queueItems).toHaveLength(32);
     const beyond = computePaymentPlan(rows, config, { rowLimitOverride: 500 });
     expect(beyond.visibleQueueItems).toHaveLength(32);
+  });
+});
+
+describe('public contract', () => {
+  it('keeps AMOUNT_FORMATS a literal tuple, as in the starter project', () => {
+    expect(AMOUNT_FORMATS.includes('plain')).toBe(true);
+    const format: (typeof AMOUNT_FORMATS)[number] = 'grouped';
+    expect(format).toBe('grouped');
+  });
+
+  it('gives a bill the same billKey whatever its queue position', () => {
+    const allBills = computePaymentPlan(rows, parsePaymentPlannerParams({}));
+    const oneProvider = computePaymentPlan(
+      rows,
+      parsePaymentPlannerParams({ providerId: 1760 }),
+    );
+    const findBill = (plan: typeof allBills) =>
+      plan.queueItems.find((queueItem) => queueItem.row.provider_bill_id === 77614);
+    expect(findBill(allBills)?.billKey).toBe('77614:90214');
+    expect(findBill(allBills)?.billKey).toBe(findBill(oneProvider)?.billKey);
+    expect(findBill(allBills)?.queuePosition).not.toBe(findBill(oneProvider)?.queuePosition);
+  });
+
+  it('computes the same plan whether the sort is cached or not', () => {
+    const config = parsePaymentPlannerParams({ selectedCount: 12, currencyIds: [643, 840] });
+    const runtimeState = { selectedCountOverride: 7, rowLimitOverride: 15 };
+    const sortedQueue = buildSortedQueue(rows, resolveQueueScope(config, runtimeState));
+    expect(computePlanFromSortedQueue(sortedQueue, config, runtimeState)).toEqual(
+      computePaymentPlan(rows, config, runtimeState),
+    );
   });
 });

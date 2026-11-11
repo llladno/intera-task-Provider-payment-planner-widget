@@ -1,20 +1,15 @@
 // @vitest-environment jsdom
-import {
-  fireEvent,
-  render,
-  screen,
-  within,
-} from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import mockData from '../data/mock-payment-queue.json';
-import '../test/setup-ui';
+import mockData from '@/data/mock-payment-queue.json';
+import '@/test/setup-ui';
+import type { IProviderPaymentQueueRow } from '@/types/provider-payment-queue';
+import { PaymentPlannerWidget } from '@planner/ui/payment-planner-widget/payment-planner-widget';
 import type {
   ICollectionDataResult,
   TWidgetSize,
-} from '../platform/widget-types';
-import type { IProviderPaymentQueueRow } from '../types/provider-payment-queue';
-import { PaymentPlannerWidget } from './payment-planner';
+} from '@platform/widget-types';
 
 type TData = ICollectionDataResult<IProviderPaymentQueueRow>;
 
@@ -164,11 +159,16 @@ describe('PaymentPlannerWidget — full size', () => {
 
   it('shows provider shares as whole percents that add up to 100', () => {
     renderWidget({ selectedCount: 14 });
-    const shares = screen.getByText('По поставщикам').closest('section') as HTMLElement;
-    const percents = Array.from(shares.querySelectorAll('.dash-payment-planner__share-value'))
-      .map((el) => Number(/·\s*(\d+)%/.exec(flat(el.textContent))?.[1]));
+    const sharesSection = screen
+      .getByText('По поставщикам')
+      .closest('section') as HTMLElement;
+    const percents = within(sharesSection)
+      .getAllByText(/·\s*\d+%/)
+      .map((shareValue) =>
+        Number(/·\s*(\d+)%/.exec(flat(shareValue.textContent))?.[1]),
+      );
     expect(percents).toEqual([55, 28, 17]);
-    expect(percents.reduce((a, b) => a + b, 0)).toBe(100);
+    expect(percents.reduce((sum, percent) => sum + percent, 0)).toBe(100);
   });
 
   it('formats plain amounts when amountFormat is plain', () => {
@@ -297,7 +297,7 @@ describe('PaymentPlannerWidget — full size', () => {
     expect(stat('выбрано к оплате')).toBe('4');
 
     await user.selectOptions(screen.getByLabelText('Поставщик'), 'all');
-    const usdCount = rows.filter((r) => r.provider_currency_id === 840).length;
+    const usdCount = rows.filter((queueRow) => queueRow.provider_currency_id === 840).length;
     await user.click(
       within(screen.getByRole('group', { name: 'Валюты' })).getByRole('button', {
         name: 'USD',
@@ -441,5 +441,87 @@ describe('PaymentPlannerWidget — compact sizes', () => {
 
     rerender(<PaymentPlannerWidget params={{ selectedCount: 14 }} data={READY} size="half" />);
     expect(container.querySelector('dialog')).not.toHaveAttribute('open');
+  });
+});
+
+describe('PaymentPlannerWidget — review fixes', () => {
+  it('keeps the same bill open when a refresh puts another bill ahead of it', async () => {
+    const user = userEvent.setup();
+    /** The row button of a bill (its number also appears in the open details). */
+    const billToggle = (billId: number): HTMLButtonElement => {
+      const toggle = screen
+        .getAllByText(new RegExp(`\\(#${billId}\\)`))
+        .map((element) => element.closest('button'))
+        .find((button) => button !== null);
+      if (!toggle) {
+        throw new Error(`no row for bill ${billId}`);
+      }
+      return toggle;
+    };
+
+    const { rerender } = renderWidget({ selectedCount: 14, rowLimit: 100 });
+    await user.click(billToggle(77614));
+    expect(billToggle(77614)).toHaveAttribute('aria-expanded', 'true');
+
+    const newBillAhead: IProviderPaymentQueueRow = {
+      ...rows[0],
+      payment_rank: 0,
+      provider_bill_id: 70001,
+      provider_bill_no: 'NEW-70001',
+      customer_bill_id: 99001,
+    };
+    rerender(
+      <PaymentPlannerWidget
+        params={{ selectedCount: 14, rowLimit: 100 }}
+        data={{ ...READY, items: [newBillAhead, ...rows] }}
+      />,
+    );
+
+    expect(billToggle(77614)).toHaveAttribute('aria-expanded', 'true');
+    expect(billToggle(70001)).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('shows a failed refresh above the empty state too', () => {
+    renderWidget({}, { ...EMPTY, error: 'refresh failed' });
+    expect(screen.getByRole('alert')).toHaveTextContent('refresh failed');
+    expect(screen.getByText('Очередь платежей пуста')).toBeInTheDocument();
+  });
+
+  it('marks invalid bills outside the plan without saying they were excluded', () => {
+    renderWidget({ selectedCount: 5, rowLimit: 100 });
+    expect(screen.getAllByText('⚠ Некорректная сумма')).toHaveLength(2);
+    expect(screen.queryByText(/\(исключена\)/)).not.toBeInTheDocument();
+  });
+
+  it('says "excluded" only for invalid bills that are in the plan', () => {
+    renderWidget({ selectedCount: 18, rowLimit: 100 });
+    // 77630 (position 16) is in the plan, 77638 (position 19) is not.
+    expect(screen.getAllByText('⚠ Некорректная сумма (исключена)')).toHaveLength(1);
+    expect(screen.getAllByText('⚠ Некорректная сумма')).toHaveLength(1);
+  });
+
+  it('shows <1% instead of 0% for a tiny but real share', () => {
+    const bigBill: IProviderPaymentQueueRow = {
+      ...rows[0],
+      provider_id: 1,
+      provider_name: 'Big Provider',
+      provider_bill_id: 1,
+      provider_total_due: 1000000,
+      payment_rank: 1,
+    };
+    const tinyBill: IProviderPaymentQueueRow = {
+      ...rows[0],
+      provider_id: 2,
+      provider_name: 'Tiny Provider',
+      provider_bill_id: 2,
+      provider_total_due: 3000,
+      payment_rank: 2,
+    };
+    renderWidget({ selectedCount: 2 }, { ...READY, items: [bigBill, tinyBill] });
+    const sharesSection = screen
+      .getByText('По поставщикам')
+      .closest('section') as HTMLElement;
+    expect(within(sharesSection).getByText(/·\s*<1%/)).toBeInTheDocument();
+    expect(within(sharesSection).getByText(/·\s*100%/)).toBeInTheDocument();
   });
 });

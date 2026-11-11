@@ -1,0 +1,15 @@
+.dash-payment-planner-notice {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.dash-payment-planner-notice--warning {
+  background: var(--dash-signal-amber-bg);
+  color: var(--dash-signal-amber-fg);
+}
+
+.dash-payment-planner-notice__hint {
+  opacity: 0.8;
+}

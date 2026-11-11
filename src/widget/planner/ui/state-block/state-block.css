@@ -1,0 +1,30 @@
+.dash-payment-planner-state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.dash-payment-planner-state-block--error {
+  border-style: solid;
+  border-color: var(--error);
+  background: var(--error-soft);
+}
+
+.dash-payment-planner-state-block__title {
+  color: var(--text-primary);
+}
+
+.dash-payment-planner-state-block__title--error {
+  color: var(--error);
+}
+
+.dash-payment-planner-state-block__text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

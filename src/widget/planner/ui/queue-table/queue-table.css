@@ -1,0 +1,111 @@
+.dash-payment-planner-queue-table__scroller {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.dash-payment-planner-queue-table__table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--dash-table-cell);
+}
+
+.dash-payment-planner-queue-table__head-cell {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-muted);
+  color: var(--dash-table-header);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.dash-payment-planner-queue-table__head-cell--end {
+  text-align: right;
+}
+
+.dash-payment-planner-queue-table__cell {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--dash-table-row-border);
+  vertical-align: middle;
+}
+
+.dash-payment-planner-queue-table__cell--end {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dash-payment-planner-queue-table__cell--nowrap {
+  white-space: nowrap;
+}
+
+.dash-payment-planner-queue-table__cell--rank {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.dash-payment-planner-queue-table__cell--selected-marker {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.dash-payment-planner-queue-table__cell--invalid-marker {
+  box-shadow: inset 3px 0 0 var(--metric-severity-warning-fg);
+}
+
+.dash-payment-planner-queue-table__row--dimmed {
+  color: var(--text-muted);
+}
+
+.dash-payment-planner-queue-table__row--selected {
+  background: var(--accent-soft);
+}
+
+.dash-payment-planner-queue-table__row--invalid {
+  background: var(--warning-soft);
+}
+
+.dash-payment-planner-queue-table__toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dash-payment-planner-queue-table__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dash-payment-planner-queue-table__title {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.dash-payment-planner-queue-table__title--active {
+  color: var(--accent-strong);
+}
+
+.dash-payment-planner-queue-table__details-row {
+  background: var(--bg-muted);
+}
+
+.dash-payment-planner-queue-table__note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--dash-table-row-border);
+}
