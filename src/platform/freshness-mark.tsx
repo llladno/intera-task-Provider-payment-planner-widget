@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import './freshness-mark.css';
+import '@platform/freshness-mark.css';
 
 export type TFreshnessSource = 'rows' | 'metric' | 'silent';
 

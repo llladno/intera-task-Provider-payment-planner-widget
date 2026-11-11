@@ -1,4 +1,4 @@
-import './widget-card.css';
+import '@platform/widget-card.css';
 
 /**
  * Class of a widget's outer card — the chrome every dashboard card shares.

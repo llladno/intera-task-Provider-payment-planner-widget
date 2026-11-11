@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
-import './widget-card.css';
+import '@platform/widget-card.css';
 
 interface IWidgetHeaderProps {
   title?: ReactNode;
