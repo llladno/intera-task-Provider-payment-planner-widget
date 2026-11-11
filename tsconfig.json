@@ -15,7 +15,13 @@
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@platform/*": ["./src/platform/*"],
+      "@planner/*": ["./src/widget/planner/*"],
+      "@sandbox/*": ["./src/sandbox/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }
