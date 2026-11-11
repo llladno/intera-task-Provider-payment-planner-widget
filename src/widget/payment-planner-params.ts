@@ -1,4 +1,10 @@
 import {
+  isRecord,
+  readBoolean,
+  readEnum,
+  readString,
+} from '../platform/widget-param-readers';
+import {
   WIDGET_ROW_LIMITS,
   WIDGET_SIZES,
   type TWidgetRowLimit,
@@ -10,6 +16,7 @@ export type TAmountFormat = (typeof AMOUNT_FORMATS)[number];
 
 export const DEFAULT_SELECTED_COUNT = 10;
 export const DEFAULT_ROW_LIMIT: TWidgetRowLimit = 10;
+export const DEFAULT_DESCRIPTION = 'Provider Payment Planner';
 
 export interface IPaymentPlannerConfig {
   /** Card header title (`params.description`, with fallback to `params.title` or `'Provider Payment Planner'`). */
@@ -39,6 +46,58 @@ export interface IPaymentPlannerConfig {
 }
 
 /**
+ * The README types these params as numbers, so only real finite numbers count;
+ * a string such as `'7'` is an error and takes the fallback.
+ */
+function toNumberParam(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function readTrimmed(value: unknown): string {
+  return readString(value).trim();
+}
+
+function readSelectedCount(value: unknown): number {
+  const parsed = toNumberParam(value);
+  return parsed === null
+    ? DEFAULT_SELECTED_COUNT
+    : Math.max(0, Math.round(parsed));
+}
+
+function readCurrencyIds(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const ids = new Set<number>();
+  for (const item of value) {
+    const id = toNumberParam(item);
+    if (id !== null) {
+      ids.add(id);
+    }
+  }
+  return Array.from(ids);
+}
+
+/** A finite number, or `'all'` for `'all'`, a missing value or anything unusable. */
+function readIdOrAll(value: unknown): number | 'all' {
+  return toNumberParam(value) ?? 'all';
+}
+
+function asRowLimit(value: unknown): TWidgetRowLimit | null {
+  const parsed = toNumberParam(value);
+  return WIDGET_ROW_LIMITS.find((limit) => limit === parsed) ?? null;
+}
+
+/** `rowLimit` wins; the legacy `maxRows` is used when `rowLimit` is absent or not allowed. */
+function readRowLimit(params: Record<string, unknown>): TWidgetRowLimit {
+  return (
+    asRowLimit(params.rowLimit) ??
+    asRowLimit(params.maxRows) ??
+    DEFAULT_ROW_LIMIT
+  );
+}
+
+/**
  * Parses untyped widget `params` into a validated `IPaymentPlannerConfig` with all defaults applied.
  *
  * Rules:
@@ -51,49 +110,23 @@ export interface IPaymentPlannerConfig {
 export function parsePaymentPlannerParams(
   params: Record<string, unknown> | undefined,
 ): IPaymentPlannerConfig {
-  const p = params ?? {};
+  const p = isRecord(params) ? params : {};
 
-  // TODO: Implement full defensive parsing according to the specification.
   return {
     description:
-      typeof p.description === 'string' && p.description.trim()
-        ? p.description.trim()
-        : typeof p.title === 'string' && p.title.trim()
-          ? p.title.trim()
-          : 'Provider Payment Planner',
-    subtitle: typeof p.subtitle === 'string' ? p.subtitle.trim() : '',
-    size: WIDGET_SIZES.includes(p.size as TWidgetSize)
-      ? (p.size as TWidgetSize)
-      : 'full',
-    selectedCount:
-      typeof p.selectedCount === 'number' && Number.isFinite(p.selectedCount)
-        ? Math.max(0, Math.round(p.selectedCount))
-        : DEFAULT_SELECTED_COUNT,
-    currencyIds: Array.isArray(p.currencyIds)
-      ? p.currencyIds.filter(
-          (id): id is number => typeof id === 'number' && Number.isFinite(id),
-        )
-      : [],
-    providerId:
-      typeof p.providerId === 'number' && Number.isFinite(p.providerId)
-        ? p.providerId
-        : 'all',
-    billingCycleId:
-      typeof p.billingCycleId === 'number' && Number.isFinite(p.billingCycleId)
-        ? p.billingCycleId
-        : 'all',
-    amountFormat: AMOUNT_FORMATS.includes(p.amountFormat as TAmountFormat)
-      ? (p.amountFormat as TAmountFormat)
-      : 'grouped',
-    rowLimit: WIDGET_ROW_LIMITS.includes(p.rowLimit as TWidgetRowLimit)
-      ? (p.rowLimit as TWidgetRowLimit)
-      : DEFAULT_ROW_LIMIT,
-    showCustomerBills:
-      typeof p.showCustomerBills === 'boolean' ? p.showCustomerBills : true,
-    showProviderBreakdown:
-      typeof p.showProviderBreakdown === 'boolean'
-        ? p.showProviderBreakdown
-        : true,
-    showSummary: typeof p.showSummary === 'boolean' ? p.showSummary : true,
+      readTrimmed(p.description) ||
+      readTrimmed(p.title) ||
+      DEFAULT_DESCRIPTION,
+    subtitle: readTrimmed(p.subtitle),
+    size: readEnum(p.size, WIDGET_SIZES, 'full'),
+    selectedCount: readSelectedCount(p.selectedCount),
+    currencyIds: readCurrencyIds(p.currencyIds),
+    providerId: readIdOrAll(p.providerId),
+    billingCycleId: readIdOrAll(p.billingCycleId),
+    amountFormat: readEnum(p.amountFormat, AMOUNT_FORMATS, 'grouped'),
+    rowLimit: readRowLimit(p),
+    showCustomerBills: readBoolean(p.showCustomerBills, true),
+    showProviderBreakdown: readBoolean(p.showProviderBreakdown, true),
+    showSummary: readBoolean(p.showSummary, true),
   };
 }
