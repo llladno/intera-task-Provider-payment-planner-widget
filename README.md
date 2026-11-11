@@ -1,136 +1,194 @@
-# Тестовое задание №2 — Provider Payment Planner Widget
+# Provider Payment Planner Widget
 
-**Проект:** INTERA Core  
-**Стек:** React 19, TypeScript 5, Vite, Vitest
+An interactive, read-only dashboard widget for the **INTERA Core** platform. It plans payments to
+providers from the `provider-payment-queue` data source (Enigma integration): the user chooses how many
+of the first bills in the filtered queue to pay, and the widget shows per-currency totals and each
+provider's share inside every currency.
 
-![Референс размеров и параметров](./reference-layout.svg)
+Stack: React 19 · TypeScript 5 (strict, no `any`) · Vite 7 · Vitest 4. No runtime dependencies besides
+React; no network access is needed — the sandbox runs on a bundled mock data set.
 
----
+> The original task statement (in Russian) is kept in [`docs/TASK.ru.md`](docs/TASK.ru.md).
 
-## 1. Цель
+## Screenshots
 
-Разработать интерактивный виджет планирования платежей поставщикам для дашборд-платформы **INTERA** на основе данных очереди счетов `provider-payment-queue` из интеграции **Enigma**.
+| Size | Light | Dark |
+| --- | --- | --- |
+| **XL** `full` (4×2) | ![full light](docs/screenshots/full-light.png) | ![full dark](docs/screenshots/full-dark.png) |
+| **L** `half` (3×2) | ![half light](docs/screenshots/half-light.png) | ![half dark](docs/screenshots/half-dark.png) |
+| **M** `third` (2×2) | ![third light](docs/screenshots/third-light.png) | ![third dark](docs/screenshots/third-dark.png) |
+| **S** `quarter` (1×2) | ![quarter light](docs/screenshots/quarter-light.png) | ![quarter dark](docs/screenshots/quarter-dark.png) |
 
-Пользователь выбирает количество первых счетов в отфильтрованной очереди (`selectedCount`) и получает список предстоящих платежей с агрегированными суммами отдельно по каждой валюте и долями поставщиков внутри валюты. Виджет является аналитическим (read-only) и не изменяет данные в Enigma.
+Data states (`full`): [stale](docs/screenshots/full-state-stale.png) ·
+[loading](docs/screenshots/full-state-loading.png) · [empty](docs/screenshots/full-state-empty.png) ·
+[error](docs/screenshots/full-state-error.png). `quarter`:
+[loading](docs/screenshots/quarter-state-loading.png) · [error](docs/screenshots/quarter-state-error.png).
 
-В архиве уже подготовлен стартовый проект с платформенными примитивами INTERA (`src/platform/`), эталонным набором данных (`src/data/mock-payment-queue.json` — 30 записей) и интерактивной песочницей (`src/sandbox/`). Ваша задача — реализовать три слоя виджета в `src/widget/`:
+## Getting started
 
-1. **`src/widget/payment-planner-params.ts`** — защитное чтение и нормализация `params: Record<string, unknown> | undefined` в `IPaymentPlannerConfig`.
-2. **`src/widget/payment-planner-compute.ts`** — чистая функция расчёта `computePaymentPlan(rows, config, runtimeState)` без зависимостей от React и DOM.
-3. **`src/widget/payment-planner.tsx` (+ `.css`)** — React-компонент `PaymentPlannerWidget`, адаптирующийся к четырём размерам карточки INTERA (`full`, `half`, `third`, `quarter`) и состояниям загрузки данных.
-
----
-
-## 2. Быстрый старт
+Requires Node.js 20+.
 
 ```bash
 npm install
-npm run dev        # запуск интерактивной песочницы
-npm test           # запуск unit-тестов (Vitest)
-npm run typecheck  # проверка типов TypeScript
+npm run dev        # interactive sandbox, http://localhost:5173
+npm test           # unit tests (Vitest)
+npm run typecheck  # TypeScript, strict
+npm run build      # type-check + production build into dist/
 ```
 
----
+The sandbox (`src/sandbox/`) lets you switch the card size (or show all four), the data state
+(`ready`, `stale`, `refreshing`, `loading`, `empty`, `error`), the theme, and every widget parameter.
 
-## 3. Источник данных и доменные правила Enigma
+## Tests
 
-Данные поступают из источника `provider-payment-queue` (`src/types/provider-payment-queue.ts`, фикстура `src/data/mock-payment-queue.json` — 30 записей в 4 валютах по 6 поставщикам).
+`npm test` runs 74 tests in four files:
 
-### Ключевые поля `IProviderPaymentQueueRow`
+| File | Covers |
+| --- | --- |
+| `payment-planner.test.ts` | `parsePaymentPlannerParams` and `computePaymentPlan`: filter → sort → cut, invalid amounts, currencies never mixed, shares, ranks, overrides. |
+| `payment-planner-format.test.ts` | Amount / percent / date / plural formatting. |
+| `use-planner-state.test.tsx` | Interactive state: slider override, filters, row limit, and when overrides are dropped. |
+| `payment-planner.ui.test.tsx` | The rendered widget (Testing Library + jsdom): every data state, all four sizes, slider / number input / filters, bill details and customer bills, the `quarter` currency overflow, the dialog, and state surviving a background refresh. |
 
-- Очередь: `payment_rank`
-- Поставщик: `provider_id`, `provider_code`, `provider_name`
-- Счёт поставщика: `provider_bill_id`, `provider_bill_no`, `provider_bill_code`, `provider_recv_date`, `provider_total_due`
-- Валюта счёта поставщика: `provider_currency_id`, `provider_currency_name` (`RUB`, `USD`, `EUR`, `GBP`)
-- Биллинговый цикл: `billing_cycle_id`, `billing_cycle_name`
-- Связанный клиентский счёт: `customer_id`, `customer_code`, `customer_name`, `customer_inn`, `customer_bill_id`, `customer_bill_no`, `customer_bill_code`, `customer_total_due`, `customer_comments`
+UI tests use jsdom, which has no modal `<dialog>`; `src/test/setup-ui.ts` emulates `showModal()` /
+`close()`.
 
-### Доменные инварианты (обязательны к соблюдению)
+## Usage
 
-1. **Фильтрация ДО отбора первых N счетов:**
-   - В `Intera.Enigma.Api` фильтры по поставщику (`providerId`), биллинговому циклу (`billingCycleId`) и валютам (`currencyIds`) сужают очередь **до** отсечки первых `selectedCount` записей.
-   - Если после применения фильтров в очереди осталось меньше записей, чем `selectedCount`, фактическое число выбранных счетов (`effectiveSelectedCount`) ограничивается длиной отфильтрованной очереди:
-     `effectiveSelectedCount = Math.min(Math.max(0, selectedCount), filteredQueue.length)`.
-2. **Сортировка и природа `payment_rank` в Enigma:**
-   - В SQL-запросе `ProviderPaymentQueueController` ранг вычисляется оконной функцией:
-     `ROW_NUMBER() OVER (PARTITION BY q.provider_id ORDER BY q.provider_recv_date, q.provider_bill_id)`.
-   - Поскольку нумерация секционирована по `provider_id`, в общей очереди у каждого поставщика есть свой счёт с `payment_rank = 1`, `payment_rank = 2` и т.д.
-   - Поэтому отфильтрованная очередь сортируется строго по правилу:
-     1) `payment_rank` по возрастанию (валидные конечные числа идут первыми; строки с отсутствующим/некорректным рангом — в конце),
-     2) при равенстве `payment_rank` — `provider_bill_id` по возрастанию,
-     3) при оставшемся равенстве — исходный порядок следования в массиве.
-   - Первые `effectiveSelectedCount` записей после сортировки получают `selected = true` (`queuePosition` от `1` до `effectiveSelectedCount`).
-3. **Обработка некорректных сумм (`hasInvalidAmount`):**
-   - Используйте `toFiniteNumber` из `src/platform/to-finite-number.ts`.
-   - Счёт поставщика считается валидным только при `providerAmount !== null && providerAmount > 0`.
-   - Если `provider_total_due` равен `null`, `0`, отрицательному числу (`-1200`) или нечисловой строке (`hasInvalidAmount = true`):
-     - такая запись **остаётся в очереди** (и занимает позицию в `effectiveSelectedCount`, если попала в срез),
-     - в интерфейсе таблицы она явно помечается предупреждением,
-     - её сумма **исключается** из `currencyTotals` и `providerBreakdown` (запрещено молча считать её равной `0`), а счётчик `invalidSelectedCount` увеличивается.
-4. **Расчёт сумм по валютам (`currencyTotals`):**
-   - Суммы рассчитываются **строго отдельно по каждой валюте** (`provider_currency_id`, `provider_currency_name`) только по выбранным валидным счетам (`selected && !hasInvalidAmount`).
-   - Складывать суммы разных валют между собой или конвертировать их запрещено.
-5. **Расчёт по поставщикам (`providerBreakdown`):**
-   - По выбранным валидным счетам рассчитываются:
-     - `selectedProviderCount` — количество уникальных поставщиков среди выбранных валидных счетов;
-     - для каждой пары `(provider_id, provider_currency_id)`: количество выбранных счетов (`billCount`), сумма платежей (`totalAmount`) и доля поставщика внутри соответствующей валюты (`sharePercent = (totalAmount / currencyTotalAmount) * 100`).
-6. **Связанные клиентские счета (`hasCustomerBill`):**
-   - Если у счёта указан непустой `customer_bill_no` и валидный `customer_total_due` (`toFiniteNumber(row.customer_total_due) !== null`), при `config.showCustomerBills === true` эти данные отображаются в таблице/деталях счёта.
+```tsx
+import { PaymentPlannerWidget } from './widget/payment-planner';
 
----
+<PaymentPlannerWidget
+  params={{ selectedCount: 14, currencyIds: [643, 840], rowLimit: 25 }}
+  data={collectionData} // ICollectionDataResult<IProviderPaymentQueueRow>
+  size="third"          // optional, overrides params.size
+/>
+```
 
-## 4. Параметры виджета (`parsePaymentPlannerParams`)
+### Parameters
 
-| Параметр | Тип в `IPaymentPlannerConfig` | Значение по умолчанию | Правило валидации / fallback |
+`params` is untyped on purpose (it comes from a dashboard layout). It is normalised by
+`parsePaymentPlannerParams`, which never throws: every bad value falls back to its default.
+Numeric params accept real numbers only, as typed in the task statement (`'7'` is an error, not `7`).
+
+| Parameter | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `description` | `string` | `'Provider Payment Planner'` | Читает `params.description` или `params.title` (trim). |
-| `subtitle` | `string` | `''` | Читает `params.subtitle` (trim). |
-| `size` | `'full' \| 'half' \| 'third' \| 'quarter'` | `'full'` | При неизвестном значении — `'full'`. |
-| `selectedCount` | `number` | `10` | Целое число `>= 0` (`Math.max(0, Math.round(n))`). При отсутствии/ошибке — `10`. |
-| `currencyIds` | `number[]` | `[]` | Массив конечных чисел без дубликатов; пустой массив = все валюты. |
-| `providerId` | `number \| 'all'` | `'all'` | Конечное число или `'all'`. |
-| `billingCycleId` | `number \| 'all'` | `'all'` | Конечное число или `'all'`. |
-| `amountFormat` | `'grouped' \| 'plain'` | `'grouped'` | `'grouped'` (с разделителями тысяч, например `1 248 500,00`) или `'plain'` (`1248500.00`). |
-| `rowLimit` | `10 \| 25 \| 50 \| 100` | `10` | Читает `params.rowLimit` или `params.maxRows`. |
-| `showCustomerBills` | `boolean` | `true` | Показывать связанные клиентские счета. |
-| `showProviderBreakdown` | `boolean` | `true` | Показывать сводку и диаграмму по поставщикам. |
-| `showSummary` | `boolean` | `true` | Показывать верхнюю сводку и итоги по валютам. |
+| `description` | `string` | `'Provider Payment Planner'` | Also reads `title`; trimmed. |
+| `subtitle` | `string` | `''` | Trimmed. |
+| `size` | `'full' \| 'half' \| 'third' \| 'quarter'` | `'full'` | Unknown value → `'full'`. The `size` prop wins over it. |
+| `selectedCount` | `number` | `10` | Rounded, clamped to `>= 0`. Anything that is not a finite number (including `'7'`) → `10`. |
+| `currencyIds` | `number[]` | `[]` | Unique finite numbers; empty = all currencies. |
+| `providerId` | `number \| 'all'` | `'all'` | |
+| `billingCycleId` | `number \| 'all'` | `'all'` | |
+| `amountFormat` | `'grouped' \| 'plain'` | `'grouped'` | `1 248 500,00 ₽` or `1248500.00 ₽`. |
+| `rowLimit` | `10 \| 25 \| 50 \| 100` | `10` | Reads `rowLimit`, then legacy `maxRows` if `rowLimit` is absent or not allowed. |
+| `showCustomerBills` | `boolean` | `true` | Linked customer bills in the table and details. |
+| `showProviderBreakdown` | `boolean` | `true` | Provider shares. |
+| `showSummary` | `boolean` | `true` | Counters and per-currency totals. |
 
----
+## Functionality
 
-## 5. Адаптация к четырём размерам INTERA
+### Domain rules (implemented in `computePaymentPlan`)
 
-1. **`full` (XL — 4/4 ширины строки, ~880px):**
-   - Общая статистика очереди (`totalQueueCount`, `effectiveSelectedCount`, `selectedProviderCount`, предупреждение при `invalidSelectedCount > 0`).
-   - Интерактивный выбор количества счетов (slider + числовой ввод / кнопки `-` и `+`) и фильтры внутри виджета.
-   - Сводка сумм по всем валютам выборки.
-   - Распределение по поставщикам с переключением валюты (или группировкой по валютам), чтобы доли внутри валюты в сумме давали 100%.
-   - Таблица очереди с выделением выбранных строк (`selected`), индикацией проблемных сумм (`hasInvalidAmount`) и просмотром деталей счёта (включая связанный клиентский счёт при `showCustomerBills = true`).
-2. **`half` (L — 1/2 ширины строки, ~600px):**
-   - Индикатор выбранных счетов (`effectiveSelectedCount из totalQueueCount`) и компактный слайдер.
-   - Полная сводка сумм по валютам и количество поставщиков.
-   - Действие открытия полной очереди платежей.
-3. **`third` (M — 1/3 ширины строки, ~400px):**
-   - Счётчик выбранных счетов относительно очереди (`14 / 30`).
-   - Суммы по валютам и компактная полоса распределения по поставщикам.
-   - Действие открытия деталей.
-4. **`quarter` (S — 1/4 ширины строки, ~240px):**
-   - Выбранное количество счетов.
-   - Компактная финансовая сводка по валютам. **Важно:** если в компактной карточке помещаются только 1–2 валюты, а в плане их больше, обязательно отображать явный индикатор остатка (например, `+ ещё 2 валюты`) и действие раскрытия полного списка, **не скрывая валюты молча и не складывая их**.
+1. **Filter → sort → cut.** `providerId`, `billingCycleId` and `currencyIds` narrow the queue *before*
+   the first `selectedCount` bills are taken.
+   `effectiveSelectedCount = min(max(0, selectedCount), filteredQueue.length)`.
+2. **Sort order:** `payment_rank` ascending (a rank may be a number or a numeric string; missing or
+   invalid ranks go last) → `provider_bill_id` ascending → original array order. `payment_rank` is
+   numbered *per provider* in Enigma, so the bill id tie-break is what makes the queue deterministic.
+3. **Invalid amounts.** `provider_total_due` that is `null`, `''`, `0`, negative or not numeric marks the bill
+   `hasInvalidAmount`. The bill stays in the queue, takes its position in the cut, is flagged in the
+   table, and is **excluded** from `currencyTotals` and `providerBreakdown` (never counted as `0`).
+   `invalidSelectedCount` reports how many selected bills were excluded.
+4. **Currencies are never mixed.** Totals are grouped by `provider_currency_id`; there is no conversion.
+5. **Shares** are computed per `(provider, currency)` as `totalAmount / currencyTotal * 100`, so the
+   shares of one currency sum to 100%. On screen they are shown as whole percents distributed with
+   the largest remainder method, so the *displayed* numbers add up to exactly 100 too.
+6. **Customer bills** are shown when `customer_bill_no` is non-empty *and* `customer_total_due` is a
+   valid number.
 
-### Требования к состояниям данных (`ICollectionDataResult`)
+### What each size shows
 
-- **Начальная загрузка (`loading && !loaded`):** скелетон внутри карточки.
-- **Фоновое обновление (`loading && loaded`):** **не размонтировать** виджет, сохраняя выбранное пользователем положение слайдера и открытые детали счёта.
-- **Устаревшие данные (`stale === true`):** отображать `<FreshnessMark source="rows" stale={true} />` в шапке карточки.
-- **Ошибка (`error !== null && !loaded`):** информативный блок ошибки.
-- **Пустая очередь (`loaded && items.length === 0`):** корректное пустое состояние.
+| Size | Content |
+| --- | --- |
+| `full` | Queue stats, slider + number input + `−`/`+`, in-widget filters (provider, cycle, currencies), per-currency totals, provider shares with a currency switch, the queue table with selected/invalid highlighting and expandable bill details (including the linked customer bill). A "Show more" link grows the table in `rowLimit` steps. |
+| `half` | `N of M` indicator with the percentage, compact slider, all currencies, provider count, oldest selected bill, provider shares, "Open payment queue" (opens the full view in a dialog). |
+| `third` | `N / M` counter, all currency totals, stacked provider strip with a currency switch, "Open details" (same dialog). |
+| `quarter` | Selected count and the first two currencies. When more exist it shows an explicit `+ ещё N валюты (EUR, GBP)` line and an "All currencies" toggle — currencies are never hidden silently or summed. |
 
----
+### Data states
 
-## 6. Критерии оценки
+| State | Behaviour |
+| --- | --- |
+| `loading && !loaded` | Skeleton inside the card. |
+| `loading && loaded` | Widget stays mounted; slider position, filters, open bill details are preserved; "Обновление…" appears in the header. |
+| `stale === true` | `<FreshnessMark source="rows" stale />` in the header (also when `loaded` is false). |
+| `error && !loaded` | Error block (`role="alert"`). |
+| `error && loaded` | Data stays, with a warning that the refresh failed. |
+| `loaded && items.length === 0` | Empty state. |
+| Filters match nothing | A dedicated "queue is empty for these filters" state with a reset button. |
 
-1. **Бизнес-логика и расчёты (30%):** соблюдение порядка «фильтрация → сортировка по `(payment_rank, provider_bill_id)` → срез первых N», корректный расчёт мультивалютных сумм и долей внутри валюты, исключение некорректных сумм из агрегатов.
-2. **Архитектура и TypeScript (25%):** чистое разделение `params` / `compute` / `view`, отсутствие `any`, прохождение `npm run typecheck` и `npm test`.
-3. **UI/UX и адаптация к 4 размерам INTERA (25%):** использование токенов темы INTERA (`src/platform/theme.css`), интерактивный слайдер, корректный индикатор дополнительных валют в компактном размере.
-4. **Обработка граничных случаев и состояний данных (20%):** работа при `loading`, `refreshing`, `stale`, `empty`, `error`, некорректных суммах и отсутствии клиентского счёта.
+## Architecture
+
+```
+src/
+  widget/
+    payment-planner-params.ts    params  → IPaymentPlannerConfig (defensive parsing, no React)
+    payment-planner-compute.ts   rows + config + runtime state → IPaymentPlanResult (pure, no React/DOM)
+    payment-planner-format.ts    amount / date / percent / plural formatting (pure)
+    use-planner-state.ts         interactive state: slider, filters, row limit
+    payment-planner-parts.tsx    presentational pieces (slider, totals, shares, table, states)
+    payment-planner.tsx          PaymentPlannerWidget: wires the above, picks the layout per size
+    payment-planner.css          styles, theme tokens only
+    *.test.ts(x)                 Vitest unit and UI tests
+  test/setup-ui.ts               jsdom setup for UI tests
+  platform/                      INTERA primitives (theme, card, FreshnessMark, helpers) — provided
+  sandbox/                       interactive playground — provided
+```
+
+Key decisions:
+
+- **Three layers.** `params` and `compute` are plain TypeScript with no React or DOM, so all business
+  rules are unit-tested without rendering. The view only formats and lays out what `compute` returns.
+- **Runtime state vs. config.** Interactive changes (slider, quick filters, "show more") are passed to
+  `computePaymentPlan` as `IPaymentPlannerRuntimeState` overrides and never mutate `params`. If the host
+  edits the matching param, the override is dropped and the new param wins, so a stale slider never
+  shadows a setting.
+- **State survives refreshes.** The state lives in the widget, which is never unmounted while
+  `loading && loaded`.
+- **Money.** Amounts are accumulated in minor units (kopecks/cents) so that repeated additions do not
+  drift; formatting is done with `Intl` and never converts between currencies.
+- **Currency order** in the totals is the order of first appearance in the sorted queue.
+- **Provider breakdown** is sorted by amount, descending.
+- **Styling.** Only INTERA theme tokens (`src/platform/theme.css`), light and dark themes. Layout
+  adapts via `data-size` and container queries, so it follows the card width rather than the viewport.
+- **Accessibility.** Native controls, labelled slider with `aria-valuetext`, `aria-pressed` toggles,
+  `aria-expanded` rows, live regions for loading / errors, `prefers-reduced-motion` respected.
+
+## Third-party libraries
+
+| Package | Use | License |
+| --- | --- | --- |
+| `react`, `react-dom` | UI | MIT |
+| `typescript` | Types | Apache-2.0 |
+| `vite`, `@vitejs/plugin-react` | Dev server and build | MIT |
+| `vitest` | Test runner | MIT |
+| `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` | UI tests (dev only) | MIT |
+
+No other runtime dependencies and no bundled fonts or images.
+
+## Known limitations
+
+- **Fixture size.** The task statement and the reference layout mention 30 queue records, but the
+  provided `src/data/mock-payment-queue.json` contains **32**. The widget works on the actual data; the
+  provided starter test that expected `30` was updated to `32`. The data file was not modified.
+- **"Open payment queue" / "Open details"** open the full widget view in a dialog, because the host
+  navigation target is not part of the task. Hooking them to host routing would mean adding an optional
+  callback prop.
+- **One row = one bill.** The task does not say what happens if the same provider bill arrives on
+  several rows (e.g. one per linked customer bill). Rows are treated independently, so such a bill
+  would be counted once per row; the table keys rows by queue position, not by bill id.
+- The table is not virtualised; `rowLimit` (max 100) plus "Show more" keep it small for typical queues.
+- UI text is in Russian, matching the reference layout. There is no i18n layer.
+- Layout and visuals are not covered by automated tests (jsdom has no layout engine); they were
+  checked manually in the sandbox in all four sizes, all six data states and both themes.
