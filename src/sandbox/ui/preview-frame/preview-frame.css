@@ -1,0 +1,31 @@
+.sandbox-preview-frame {
+  width: 100%;
+}
+
+.sandbox-preview-frame--full {
+  max-width: 920px;
+}
+
+.sandbox-preview-frame--half {
+  max-width: 620px;
+}
+
+.sandbox-preview-frame--third {
+  max-width: 400px;
+}
+
+.sandbox-preview-frame--quarter {
+  max-width: 240px;
+}
+
+.sandbox-preview-frame__label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}

@@ -1,0 +1,19 @@
+.sandbox-preview-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.sandbox-preview-stage__all-sizes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.sandbox-preview-stage__bottom-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: flex-start;
+}

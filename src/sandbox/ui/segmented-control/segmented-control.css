@@ -1,0 +1,28 @@
+.sandbox-segmented-control {
+  display: inline-flex;
+  background: var(--nav-surface);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  gap: 2px;
+}
+
+.sandbox-segmented-control__button {
+  border: none;
+  background: transparent;
+  color: var(--nav-text);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.sandbox-segmented-control__button:hover {
+  background: var(--nav-surface-active);
+}
+
+.sandbox-segmented-control__button--active {
+  background: var(--accent);
+  color: #ffffff;
+}
